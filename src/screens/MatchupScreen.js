@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase, getUserRecord } from '../services/supabase';
 import { distributeMatchupLineups } from '../services/distribution';
 import { refreshLiveScores, getCurrentWeekGames, shouldPollScores, fetchNFLState, areAllGamesFinal } from '../services/liveScoring';
@@ -12,6 +13,7 @@ const DEFAULT_SETTINGS = { "QB": 1, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "SUPER
 
 export default function MatchupScreen({ route, navigation }) {
     const { friend } = route.params || {};
+    const insets = useSafeAreaInsets();
     const [loading, setLoading] = useState(true);
     const [matchupId, setMatchupId] = useState(null);
 
@@ -196,9 +198,6 @@ export default function MatchupScreen({ route, navigation }) {
             // If active, maybe change status back to pending?
             if (status === 'active') {
                 updatePayload.status = 'pending';
-                // Also unconfirm opponent? Usually yes, if terms change, contract is void.
-                // But for simplicity, let's just unconfirm ME, and since I am not confirmed, status becomes pending.
-                // NOTE: logic block below handles status calc.
             }
 
             const { error } = await supabase
@@ -255,13 +254,10 @@ export default function MatchupScreen({ route, navigation }) {
         try {
             // Determine winner
             let winnerId = null;
-            if (totalA > totalB) winnerId = currentUserId; // currentUserId matches user1_id or user2_id? No, strictly current user. 
-            // Wait, I need to know which score corresponds to which ID? 
-            // totalA is MY score. totalB is OPPONENT score.
+            if (totalA > totalB) winnerId = currentUserId;
             else if (totalB > totalA) winnerId = opponentId;
 
             // Map score to correct columns
-            // amIUser1 is true if currentUserId == user1_id
             const u1Score = amIUser1 ? totalA : totalB;
             const u2Score = amIUser1 ? totalB : totalA;
 
@@ -322,83 +318,68 @@ export default function MatchupScreen({ route, navigation }) {
 
     // --- Render Helpers ---
 
-    const renderStatusBanner = () => {
+    const renderHeaderStatus = () => {
         if (status === 'active') {
-            return (
-                <View style={[styles.statusBanner, styles.statusActive]}>
-                    <Text style={styles.statusText}>● MATCHUP LIVE</Text>
-                </View>
-            );
+            return <Text style={[styles.vsText, { color: '#28a745' }]}>LIVE</Text>;
         }
-
-        // Pending State
-        const iConfirmed = amIUser1 ? user1Confirmed : user2Confirmed;
-        const oppConfirmed = amIUser1 ? user2Confirmed : user1Confirmed;
-
-        if (iConfirmed && !oppConfirmed) {
-            return (
-                <View style={[styles.statusBanner, styles.statusWaiting]}>
-                    <Text style={[styles.statusText, styles.textDark]}>Waiting for opponent to confirm...</Text>
-                </View>
-            );
+        if (status === 'final') {
+            return <Text style={[styles.vsText, { color: colors.textSecondary }]}>FINAL</Text>;
         }
-
-        // I haven't confirmed, or nobody has
-        return (
-            <View style={styles.statusBannerContainer}>
-                <View style={[styles.statusBanner, styles.statusPending]}>
-                    <Text style={[styles.statusText, styles.textDark]}>Matchup Pending - Adjust Roster & Confirm</Text>
-                </View>
-                <AppButton
-                    title="Confirm Settings"
-                    onPress={confirmMatchup}
-                    style={styles.confirmButton}
-                    size="small"
-                />
-            </View>
-        );
+        return <Text style={styles.vsText}>VS</Text>;
     };
 
-    const renderModifiers = () => (
-        <View style={styles.modifiersContainer}>
-            <Text style={styles.sectionLabel}>Your Roster Settings</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modifiersScroll}>
-                {POSITIONS.map(pos => {
-                    const myVal = mySettings[pos] || 0;
-                    const oppVal = opponentSettings[pos] || 0;
-                    const effective = Math.min(myVal, oppVal);
-                    // Warn if my value is higher than effective (means opponent is capping it)
-                    const isCapped = myVal > oppVal;
+    const renderSettings = () => (
+        <View style={styles.settingsSection}>
+            <Text style={styles.sectionLabel}>Matchup Settings</Text>
 
-                    return (
-                        <View key={pos} style={[styles.modifierCard, isCapped && styles.modifierCardCapped]}>
-                            <Text style={styles.modifierTitle}>{pos}</Text>
-                            <View style={styles.modifierControls}>
-                                <TouchableOpacity onPress={() => updatePositionCount(pos, -1)} style={styles.modBtn}>
-                                    <Text style={styles.modBtnText}>-</Text>
-                                </TouchableOpacity>
-                                <Text style={styles.modifierCount}>{myVal}</Text>
-                                <TouchableOpacity onPress={() => updatePositionCount(pos, 1)} style={styles.modBtn}>
-                                    <Text style={styles.modBtnText}>+</Text>
-                                </TouchableOpacity>
+            {/* Format Selector */}
+            <View style={styles.formatSelectorRaw}>
+                <Text style={styles.settingLabel}>Score Format:</Text>
+                <View style={styles.compactFormatContainer}>
+                    {['STD', 'PPR', 'HALF'].map(format => (
+                        <TouchableOpacity
+                            key={format}
+                            style={[styles.compactFormatBtn, scoringType === format && styles.compactFormatBtnActive]}
+                            onPress={() => setScoringType(format)}
+                        >
+                            <Text style={[styles.compactFormatText, scoringType === format && styles.textWhite]}>
+                                {format}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+
+            {/* Modifiers */}
+            <View style={styles.modifiersRow}>
+                <Text style={styles.settingLabel}>Roster Slots:</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compactModifiersScroll}>
+                    {POSITIONS.map(pos => {
+                        const myVal = mySettings[pos] || 0;
+                        const oppVal = opponentSettings[pos] || 0;
+                        const isCapped = myVal > oppVal;
+
+                        return (
+                            <View key={pos} style={[styles.compactModCard, isCapped && styles.modCardCapped]}>
+                                <Text style={styles.compactModTitle}>{pos}</Text>
+                                <View style={styles.compactModControls}>
+                                    <TouchableOpacity onPress={() => updatePositionCount(pos, -1)} style={styles.compactModBtn}>
+                                        <Text style={styles.compactBtnText}>-</Text>
+                                    </TouchableOpacity>
+                                    <Text style={styles.compactModCount}>{myVal}</Text>
+                                    <TouchableOpacity onPress={() => updatePositionCount(pos, 1)} style={styles.compactModBtn}>
+                                        <Text style={styles.compactBtnText}>+</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-                            {isCapped && <Text style={styles.cappedText}>(Limit: {oppVal})</Text>}
-                        </View>
-                    );
-                })}
-            </ScrollView>
+                        );
+                    })}
+                </ScrollView>
+            </View>
         </View>
     );
 
     const renderRoster = () => {
-        if (status !== 'active') {
-            // Review/Preview Mode
-            // Could show a placeholder or "Preview"
-            // Requirement: "default as no contest" -> maybe just show empty?
-            // "This 'confirms' both users want to participate"
-            // I'll show the preview but with opacity or overlay
-        }
-
         const effectiveSettings = getEffectiveSettings();
         const slots = [];
         POSITIONS.forEach(pos => {
@@ -409,34 +390,34 @@ export default function MatchupScreen({ route, navigation }) {
         });
 
         if (slots.length === 0) {
-            return <View style={styles.emptyState}><Text style={styles.emptyStateText}>No active slots.</Text></View>;
+            return (
+                <View style={styles.emptyState}>
+                    <Text style={styles.emptyStateText}>No active slots. Adjust settings below.</Text>
+                </View>
+            );
         }
 
         return (
-            <View style={[styles.rosterContainer, status !== 'active' && { opacity: 0.7 }]}>
-                <View style={styles.tableHeader}>
-                    <Text style={styles.headerText}>
-                        {status === 'active' ? 'Starters' : 'Preview (Pending Confirmation)'}
-                    </Text>
-                </View>
+            <View style={[styles.rosterContainer, status !== 'active' && { opacity: 0.8 }]}>
                 {slots.map((slot, index) => {
                     const slotA = lineupA[index];
                     const slotB = lineupB[index];
-
                     return (
                         <View key={slot.key} style={styles.rosterRow}>
                             {/* User A (Me) */}
                             <View style={styles.playerSlot}>
                                 {slotA?.player ? (
                                     <>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <Text style={styles.playerName}>{slotA.player.first_name} {slotA.player.last_name}</Text>
+                                        <View style={styles.nameRow}>
+                                            <Text style={styles.playerName} numberOfLines={1}>
+                                                {slotA.player.first_name.charAt(0)}. {slotA.player.last_name}
+                                            </Text>
                                             {slotA.rank && <Text style={styles.rankText}>#{slotA.rank}</Text>}
                                         </View>
                                         <Text style={styles.playerScore}>{slotA.live.toFixed(1)}</Text>
                                     </>
                                 ) : (
-                                    <Text style={styles.playerName}>Empty</Text>
+                                    <Text style={styles.emptyText}>--</Text>
                                 )}
                             </View>
 
@@ -445,17 +426,19 @@ export default function MatchupScreen({ route, navigation }) {
                             </View>
 
                             {/* User B (Opponent) */}
-                            <View style={styles.playerSlot}>
+                            <View style={[styles.playerSlot, { alignItems: 'flex-end' }]}>
                                 {slotB?.player ? (
                                     <>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
-                                            <Text style={styles.playerName}>{slotB.player.first_name} {slotB.player.last_name}</Text>
-                                            {slotB.rank && <Text style={[styles.rankText, { marginLeft: 4 }]}>#{slotB.rank}</Text>}
+                                        <View style={[styles.nameRow, { justifyContent: 'flex-end' }]}>
+                                            <Text style={styles.playerName} numberOfLines={1}>
+                                                {slotB.player.first_name.charAt(0)}. {slotB.player.last_name}
+                                            </Text>
+                                            {slotB.rank && <Text style={styles.rankText}>#{slotB.rank}</Text>}
                                         </View>
-                                        <Text style={[styles.playerScore, styles.alignRight]}>{slotB.live.toFixed(1)}</Text>
+                                        <Text style={styles.playerScore}>{slotB.live.toFixed(1)}</Text>
                                     </>
                                 ) : (
-                                    <Text style={[styles.playerName, styles.alignRight]}>Empty</Text>
+                                    <Text style={styles.emptyText}>--</Text>
                                 )}
                             </View>
                         </View>
@@ -465,56 +448,63 @@ export default function MatchupScreen({ route, navigation }) {
         );
     };
 
+    const shouldShowConfirm = status === 'pending' && ((amIUser1 && !user1Confirmed) || (!amIUser1 && !user2Confirmed));
+    const isWaiting = status === 'pending' && ((amIUser1 && user1Confirmed) || (!amIUser1 && user2Confirmed));
+
     if (loading) {
         return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={colors.primary} /></View>;
     }
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.scoreboard}>
+            {/* Condensed Header */}
+            <View style={[styles.scoreboard, { paddingTop: Math.max(insets.top, 10) }]}>
                 <View style={styles.teamHeader}>
-                    <View style={styles.avatar} />
-                    <Text style={styles.teamName}>You</Text>
-                    <Text style={styles.recordText}>({recordA.wins}-{recordA.losses}-{recordA.ties})</Text>
+                    <View style={styles.avatarSmall} />
+                    <View>
+                        <Text style={styles.teamNameSmall}>You</Text>
+                        <Text style={styles.recordText}>({recordA.wins}-{recordA.losses}-{recordA.ties})</Text>
+                    </View>
                     <Text style={styles.totalScore}>{totalA.toFixed(2)}</Text>
                 </View>
+
                 <View style={styles.vsContainer}>
-                    <Text style={styles.vsText}>VS</Text>
+                    {renderHeaderStatus()}
                 </View>
-                <View style={styles.teamHeader}>
-                    <View style={[styles.avatar, { backgroundColor: colors.secondary }]} />
-                    <Text style={styles.teamName}>{friend?.username || 'Opponent'}</Text>
-                    <Text style={styles.recordText}>({recordB.wins}-{recordB.losses}-{recordB.ties})</Text>
+
+                <View style={[styles.teamHeader, { alignItems: 'flex-end', justifyContent: 'flex-end' }]}>
                     <Text style={styles.totalScore}>{totalB.toFixed(2)}</Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={styles.teamNameSmall}>{friend?.username || 'Opp'}</Text>
+                        <Text style={styles.recordText}>({recordB.wins}-{recordB.losses}-{recordB.ties})</Text>
+                    </View>
+                    <View style={[styles.avatarSmall, { backgroundColor: colors.secondary, marginLeft: 8 }]} />
                 </View>
             </View>
 
-            {renderStatusBanner()}
-
-            <View style={styles.formatSelectorContainer}>
-                <Text style={styles.formatLabel}>Scoring Format:</Text>
-                <View style={styles.formatButtons}>
-                    {['STD', 'PPR', 'HALF'].map(format => (
-                        <TouchableOpacity
-                            key={format}
-                            style={[styles.formatButton, scoringType === format && styles.formatButtonActive]}
-                            onPress={() => setScoringType(format)}
-                        >
-                            <Text style={[styles.formatButtonText, scoringType === format && styles.formatButtonTextActive]}>
-                                {format === 'HALF' ? 'HALF PPR' : format}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </View>
-
-            {renderModifiers()}
-
-            <ScrollView style={styles.scrollContent}>
+            {/* Main Content */}
+            <ScrollView contentContainerStyle={styles.scrollContent}>
                 {renderRoster()}
-                <View style={{ height: 40 }} />
+                {renderSettings()}
+                <View style={{ height: 80 }} />
             </ScrollView>
+
+            {/* Footer Action */}
+            {shouldShowConfirm && (
+                <View style={[styles.footerAction, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+                    <AppButton
+                        title="Confirm Matchup"
+                        onPress={confirmMatchup}
+                        style={styles.confirmButton}
+                    />
+                </View>
+            )}
+
+            {isWaiting && (
+                <View style={[styles.footerAction, styles.waitingFooter, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+                    <Text style={styles.waitingText}>Waiting for opponent to confirm...</Text>
+                </View>
+            )}
         </View>
     );
 }
@@ -523,64 +513,64 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-    // Status
-    statusBannerContainer: { padding: spacing.s, backgroundColor: '#FFF3CD', gap: 8 },
-    statusBanner: { padding: spacing.xs, alignItems: 'center', justifyContent: 'center' },
-    statusActive: { backgroundColor: '#D4EDDA', padding: spacing.s, flexDirection: 'row', justifyContent: 'space-between' },
-    statusPending: { backgroundColor: 'transparent' }, // Container handles color
-    statusWaiting: { backgroundColor: '#CCE5FF', padding: spacing.s },
-    statusText: { fontWeight: 'bold', fontSize: 12, color: '#155724' },
-    finalBtn: { backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
-    finalBtnText: { color: colors.white, fontSize: 10, fontWeight: 'bold' },
-    recordText: { color: 'rgba(255,255,255,0.8)', fontSize: 10, marginBottom: 2 },
-    emptySlot: { justifyContent: 'center', height: 40 },
-    rankText: { fontSize: 10, color: '#6c757d', marginLeft: 4, fontWeight: 'bold' },
-    textDark: { color: '#856404' },
-    confirmButton: { width: '100%' },
-
-    // Header
-    scoreboard: { flexDirection: 'row', backgroundColor: colors.primary, padding: spacing.l, alignItems: 'center', justifyContent: 'space-between', paddingTop: 20 },
-    teamHeader: { alignItems: 'center', flex: 1 },
-    avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: 4 },
-    teamName: { color: colors.white, fontWeight: 'bold', fontSize: 14, marginBottom: 2 },
-    totalScore: { color: colors.white, fontSize: 20, fontWeight: 'bold' },
-    vsText: { color: 'rgba(255,255,255,0.6)', fontWeight: 'bold', fontSize: 16 },
-
-    // Modifiers
-    modifiersContainer: { backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.s },
-    sectionLabel: { marginLeft: spacing.m, marginBottom: 4, fontSize: 10, fontWeight: 'bold', color: colors.textSecondary, textTransform: 'uppercase' },
-    modifiersScroll: { paddingHorizontal: spacing.m, gap: spacing.s },
-    modifierCard: { alignItems: 'center', backgroundColor: '#F8F9FA', padding: 8, borderRadius: 8, minWidth: 70, borderWidth: 1, borderColor: '#E1E4E8' },
-    modifierCardCapped: { borderColor: '#FFA000', backgroundColor: '#FFF8E1' },
-    modifierTitle: { fontSize: 10, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 4 },
-    modifierControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    modBtn: { padding: 2 },
-    modBtnText: { fontSize: 18, fontWeight: 'bold', color: colors.primary, width: 15, textAlign: 'center' },
-    modifierCount: { fontSize: 14, fontWeight: 'bold', color: colors.text, width: 10, textAlign: 'center' },
-    cappedText: { fontSize: 8, color: '#E65100', marginTop: 2, fontWeight: 'bold' },
-
-    // Format Selector
-    formatSelectorContainer: { paddingHorizontal: spacing.m, paddingVertical: spacing.s, backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: '#E5E5E5' },
-    formatLabel: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginBottom: spacing.s },
-    formatButtons: { flexDirection: 'row', gap: spacing.s },
-    formatButton: { flex: 1, paddingVertical: 8, paddingHorizontal: spacing.s, borderRadius: borderRadius.s, borderWidth: 1, borderColor: colors.border, alignItems: 'center', backgroundColor: colors.white },
-    formatButtonActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    formatButtonText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-    formatButtonTextActive: { color: colors.white },
+    // Header (Condensed)
+    scoreboard: {
+        flexDirection: 'row',
+        backgroundColor: colors.primary,
+        paddingHorizontal: spacing.m,
+        paddingVertical: spacing.s,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, elevation: 4, zIndex: 1
+    },
+    teamHeader: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+    avatarSmall: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.3)', marginRight: 8 },
+    teamNameSmall: { color: colors.white, fontWeight: 'bold', fontSize: 12 },
+    recordText: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
+    totalScore: { color: colors.white, fontSize: 18, fontWeight: 'bold', marginHorizontal: 8 },
+    vsContainer: { paddingHorizontal: 10, alignItems: 'center', minWidth: 50 },
+    vsText: { color: 'rgba(255,255,255,0.8)', fontWeight: 'bold', fontSize: 14, textAlign: 'center' },
 
     // Roster
-    scrollContent: { flex: 1 },
-    rosterContainer: { backgroundColor: colors.card, margin: spacing.m, borderRadius: borderRadius.m, overflow: 'hidden', shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-    tableHeader: { backgroundColor: '#F8F9FA', padding: spacing.s, borderBottomWidth: 1, borderBottomColor: colors.border },
-    headerText: { fontWeight: 'bold', color: colors.textSecondary, fontSize: 12, textTransform: 'uppercase', textAlign: 'center' },
-    rosterRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: spacing.s, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
-    positionBadge: { width: 60, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F0F2F5', paddingVertical: 4, borderRadius: 4, marginHorizontal: spacing.s },
-    positionText: { fontSize: 10, fontWeight: 'bold', color: colors.textSecondary },
-    playerSlot: { flex: 1 },
-    playerName: { fontSize: 13, color: colors.textSecondary, fontWeight: '500' },
+    scrollContent: { paddingVertical: spacing.m },
+    rosterContainer: { backgroundColor: colors.white, marginHorizontal: spacing.m, borderRadius: borderRadius.m, overflow: 'hidden', paddingVertical: 4 },
+    rosterRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: spacing.s, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', height: 50 },
+    positionBadge: { width: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F0F2F5', paddingVertical: 2, borderRadius: 4, marginHorizontal: 4 },
+    positionText: { fontSize: 9, fontWeight: 'bold', color: colors.textSecondary },
+    playerSlot: { flex: 1, justifyContent: 'center' },
+    nameRow: { flexDirection: 'row', alignItems: 'center' },
+    playerName: { fontSize: 13, color: colors.text, fontWeight: '600' },
     playerScore: { fontSize: 11, color: colors.textSecondary },
-    alignRight: { textAlign: 'right' },
-    conflictText: { color: colors.destructive, fontStyle: 'italic' },
-    emptyState: { padding: 20, alignItems: 'center' },
+    rankText: { fontSize: 10, color: '#6c757d', marginLeft: 4 },
+    emptyText: { color: '#ccc', fontSize: 12, fontStyle: 'italic' },
+    emptyState: { padding: 40, alignItems: 'center' },
     emptyStateText: { color: colors.textSecondary },
+
+    // Settings (Bottom)
+    settingsSection: { marginTop: spacing.l, paddingHorizontal: spacing.m, paddingTop: spacing.m, borderTopWidth: 1, borderTopColor: '#E0E0E0', backgroundColor: '#FAFAFA' },
+    sectionLabel: { fontSize: 12, fontWeight: 'bold', color: colors.textSecondary, marginBottom: spacing.s, textTransform: 'uppercase' },
+    settingLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, width: 80 },
+
+    formatSelectorRaw: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.m },
+    compactFormatContainer: { flexDirection: 'row', flex: 1, backgroundColor: '#E0E0E0', borderRadius: 8, padding: 2 },
+    compactFormatBtn: { flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 6 },
+    compactFormatBtnActive: { backgroundColor: colors.primary, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 1 },
+    compactFormatText: { fontSize: 10, fontWeight: 'bold', color: colors.textSecondary },
+    textWhite: { color: colors.white },
+
+    modifiersRow: { flexDirection: 'row', alignItems: 'center' },
+    compactModifiersScroll: { gap: 8, paddingRight: 20 },
+    compactModCard: { alignItems: 'center', backgroundColor: colors.white, padding: 4, borderRadius: 6, borderWidth: 1, borderColor: '#E0E0E0', width: 60 },
+    modCardCapped: { borderColor: '#FFB74D', backgroundColor: '#FFF3E0' },
+    compactModTitle: { fontSize: 9, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 2 },
+    compactModControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
+    compactModBtn: { padding: 4 },
+    compactBtnText: { fontSize: 14, fontWeight: 'bold', color: colors.primary },
+    compactModCount: { fontSize: 12, fontWeight: 'bold', color: colors.text },
+
+    // Footer
+    footerAction: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.white, padding: spacing.m, borderTopWidth: 1, borderTopColor: colors.border },
+    waitingFooter: { backgroundColor: '#FFF3CD', borderTopColor: '#FFEEBA', alignItems: 'center' },
+    waitingText: { color: '#856404', fontWeight: 'bold' },
+    confirmButton: { width: '100%' },
 });

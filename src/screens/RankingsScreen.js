@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { spacing, borderRadius } from '../theme/layout';
 import AppButton from '../components/AppButton';
@@ -13,6 +14,7 @@ const FORMATS = ['STD', 'PPR', 'HALF'];
 
 export default function RankingsScreen({ navigation }) {
     // State
+    const insets = useSafeAreaInsets();
     const [selectedPos, setSelectedPos] = useState('QB');
     const [selectedFormat, setSelectedFormat] = useState('STD');
     const [players, setPlayers] = useState([]);
@@ -148,7 +150,7 @@ export default function RankingsScreen({ navigation }) {
 
     const renderHeader = () => (
         <View>
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.l) }]}>
                 <Text style={styles.title}>My Rankings</Text>
                 <View style={styles.headerButtons}>
                     <AppButton

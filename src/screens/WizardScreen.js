@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabase';
 import { colors } from '../theme/colors';
 import RankingWizard from '../components/RankingWizard';
@@ -13,6 +14,7 @@ import { loadWizardState } from '../services/wizard';
  */
 export default function WizardScreen({ route, navigation }) {
     const { position, scoringType } = route.params;
+    const insets = useSafeAreaInsets();
 
     const [userId, setUserId] = useState(null);
     const [players, setPlayers] = useState([]);
@@ -140,7 +142,7 @@ export default function WizardScreen({ route, navigation }) {
     }
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingTop: insets.top }]}>
             <RankingWizard
                 initialPlayers={players}
                 userId={userId}
