@@ -21,17 +21,25 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.container}>
             <View style={styles.content}>
                 <Text style={styles.title}>Welcome to Veritas Football!</Text>
-                <Text style={styles.subtitle}>Manage your league, challenge friends, and track your stats.</Text>
+                <Text style={styles.subtitle}>
+                    Veritas football uses your rankings to create perfect rosters. Find and challenge friends in Arena. Customize rankings to give your team an edge.
+                </Text>
 
                 <View style={styles.buttonContainer}>
                     <AppButton
-                        title="Go to Friends"
+                        title="Arena"
                         onPress={() => navigation.navigate('Friends')}
                         style={styles.button}
                     />
                     <AppButton
-                        title="My Rankings"
+                        title="Rankings"
                         onPress={() => navigation.navigate('Rankings')}
+                        outline
+                        style={styles.button}
+                    />
+                    <AppButton
+                        title="My Profile"
+                        onPress={() => navigation.navigate('Profile')}
                         outline
                         style={styles.button}
                     />
@@ -79,5 +87,18 @@ const styles = StyleSheet.create({
     },
     button: {
         marginBottom: spacing.s,
-    }
+    },
+    infoBox: {
+        backgroundColor: colors.card,
+        padding: spacing.m,
+        borderRadius: 8,
+        width: '100%',
+        alignItems: 'center',
+    },
+    infoText: {
+        color: colors.textSecondary,
+        fontSize: 14,
+        marginBottom: 4,
+        textAlign: 'center',
+    },
 });

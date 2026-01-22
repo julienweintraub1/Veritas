@@ -459,10 +459,23 @@ export default function MatchupScreen({ route, navigation }) {
         <View style={styles.container}>
             {/* Condensed Header */}
             <View style={[styles.scoreboard, { paddingTop: Math.max(insets.top, 10) }]}>
+                {/* Chat Button (Top Right Absolute) or just layout */}
+                <TouchableOpacity
+                    style={styles.chatButton}
+                    onPress={() => navigation.navigate('Chat', { friend })}
+                >
+                    <Text style={{ fontSize: 20 }}>💬</Text>
+                </TouchableOpacity>
+
                 <View style={styles.teamHeader}>
-                    <View style={styles.avatarSmall} />
-                    <View>
-                        <Text style={styles.teamNameSmall}>You</Text>
+                    {/* My Avatar (Placeholder or Real) */}
+                    <View style={styles.avatarSmall}>
+                        <Text style={styles.avatarText}>{recordA.username?.charAt(0) || 'Me'}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.teamNameSmall} numberOfLines={1} ellipsizeMode="tail">
+                            {recordA.username || 'You'}
+                        </Text>
                         <Text style={styles.recordText}>({recordA.wins}-{recordA.losses}-{recordA.ties})</Text>
                     </View>
                     <Text style={styles.totalScore}>{totalA.toFixed(2)}</Text>
@@ -474,16 +487,30 @@ export default function MatchupScreen({ route, navigation }) {
 
                 <View style={[styles.teamHeader, { alignItems: 'flex-end', justifyContent: 'flex-end' }]}>
                     <Text style={styles.totalScore}>{totalB.toFixed(2)}</Text>
-                    <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={styles.teamNameSmall}>{friend?.username || 'Opp'}</Text>
+                    <View style={{ alignItems: 'flex-end', flex: 1 }}>
+                        <Text style={styles.teamNameSmall} numberOfLines={1} ellipsizeMode="tail">
+                            {friend?.username || 'Opponent'}
+                        </Text>
                         <Text style={styles.recordText}>({recordB.wins}-{recordB.losses}-{recordB.ties})</Text>
                     </View>
-                    <View style={[styles.avatarSmall, { backgroundColor: colors.secondary, marginLeft: 8 }]} />
+                    <View style={[styles.avatarSmall, { backgroundColor: colors.secondary, marginLeft: 8 }]}>
+                        <Text style={styles.avatarText}>{friend?.username?.charAt(0) || 'Opp'}</Text>
+                    </View>
                 </View>
             </View>
 
             {/* Main Content */}
             <ScrollView contentContainerStyle={styles.scrollContent}>
+                {/* Training Wheels / Guidance */}
+                {status === 'pending' && (
+                    <View style={styles.guidanceBox}>
+                        <Text style={styles.guidanceText}>How to play:</Text>
+                        <Text style={styles.guidanceSub}>1. Adjust position counts below to set your max preference.</Text>
+                        <Text style={styles.guidanceSub}>2. The lower count between you and your opponent sets the slot limit.</Text>
+                        <Text style={styles.guidanceSub}>3. Confirm when you are ready!</Text>
+                    </View>
+                )}
+
                 {renderRoster()}
                 {renderSettings()}
                 <View style={{ height: 80 }} />
@@ -502,7 +529,7 @@ export default function MatchupScreen({ route, navigation }) {
 
             {isWaiting && (
                 <View style={[styles.footerAction, styles.waitingFooter, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-                    <Text style={styles.waitingText}>Waiting for opponent to confirm...</Text>
+                    <Text style={styles.waitingText}>Waiting for {friend?.username} to confirm...</Text>
                 </View>
             )}
         </View>
@@ -573,4 +600,44 @@ const styles = StyleSheet.create({
     waitingFooter: { backgroundColor: '#FFF3CD', borderTopColor: '#FFEEBA', alignItems: 'center' },
     waitingText: { color: '#856404', fontWeight: 'bold' },
     confirmButton: { width: '100%' },
+    chatButton: {
+        position: 'absolute',
+        top: 40,
+        right: 10,
+        zIndex: 10,
+        backgroundColor: colors.white,
+        borderRadius: 20,
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        elevation: 3,
+    },
+    guidanceBox: {
+        backgroundColor: '#FFF3E0', // Light orange
+        marginHorizontal: spacing.m,
+        marginBottom: spacing.s,
+        padding: spacing.m,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FFB74D',
+    },
+    guidanceText: {
+        fontWeight: 'bold',
+        color: '#E65100',
+        marginBottom: 4,
+    },
+    guidanceSub: {
+        fontSize: 12,
+        color: '#E65100',
+        marginBottom: 2,
+    },
+    avatarText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 12,
+    }
 });

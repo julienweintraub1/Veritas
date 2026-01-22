@@ -151,7 +151,7 @@ export default function FriendsScreen({ navigation }) {
             <View style={styles.inputContainer}>
                 <TextInput
                     style={styles.input}
-                    placeholder="Enter username to add..."
+                    placeholder="Find friend by username..."
                     placeholderTextColor={colors.textSecondary}
                     value={newFriend}
                     onChangeText={setNewFriend}
@@ -167,7 +167,7 @@ export default function FriendsScreen({ navigation }) {
             </View>
 
             {/* Friends List Section */}
-            <Text style={styles.sectionTitle}>Your Friends</Text>
+            <Text style={styles.sectionTitle}>Friends</Text>
             <FlatList
                 data={friends}
                 keyExtractor={(item) => item.id}
@@ -190,7 +190,7 @@ export default function FriendsScreen({ navigation }) {
                     </View>
                 )}
                 ListEmptyComponent={
-                    <Text style={styles.emptyText}>No friends yet. Add one by username above!</Text>
+                    <Text style={styles.emptyText}>No friends yet. Find one by username above!</Text>
                 }
             />
         </View>
@@ -198,6 +198,7 @@ export default function FriendsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+    // ... (styles unchanged for the most part, but including them to satisfy tool)
     container: {
         flex: 1,
         padding: spacing.m,

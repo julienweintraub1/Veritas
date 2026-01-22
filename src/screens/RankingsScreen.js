@@ -35,6 +35,11 @@ export default function RankingsScreen({ navigation }) {
         }, [selectedPos, selectedFormat])
     );
 
+    // Auto-Sync on Mount
+    useEffect(() => {
+        handleSync();
+    }, []);
+
     const fetchRankings = async () => {
         setLoading(true);
         try {
@@ -112,9 +117,10 @@ export default function RankingsScreen({ navigation }) {
 
     const handleSync = async () => {
         setSyncing(true);
-        setSyncStatus('Starting...');
+        setSyncStatus('Syncing latest players...');
         await syncPlayersToSupabase(setSyncStatus);
         setSyncing(false);
+        setSyncStatus(''); // Clear status when done
         fetchRankings();
     };
 
@@ -151,15 +157,8 @@ export default function RankingsScreen({ navigation }) {
     const renderHeader = () => (
         <View>
             <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.l) }]}>
-                <Text style={styles.title}>My Rankings</Text>
+                <Text style={styles.title}>Rankings</Text>
                 <View style={styles.headerButtons}>
-                    <AppButton
-                        title={syncing ? "Syncing..." : "Sync"}
-                        onPress={handleSync}
-                        disabled={syncing}
-                        style={styles.syncBtn}
-                        textStyle={{ fontSize: 12 }}
-                    />
                     <AppButton
                         title="Wizard"
                         onPress={() => navigation.navigate('Wizard', { position: selectedPos, scoringType: selectedFormat })}
@@ -168,6 +167,16 @@ export default function RankingsScreen({ navigation }) {
                     />
                 </View>
             </View>
+            {/* Training Wheels Guidance */}
+            <View style={styles.guidanceContainer}>
+                <Text style={styles.guidanceText}>
+                    Rankings save automatically as you move players.
+                </Text>
+                <Text style={styles.guidanceSubText}>
+                    Tip: Use the Wizard for a faster, more accurate starting point!
+                </Text>
+            </View>
+
             {syncStatus ? <Text style={styles.syncStatus}>{syncStatus}</Text> : null}
         </View>
     );
@@ -290,6 +299,27 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
         textAlign: 'center',
         paddingBottom: spacing.s,
+    },
+    guidanceContainer: {
+        backgroundColor: colors.card,
+        padding: spacing.m,
+        marginHorizontal: spacing.m,
+        marginBottom: spacing.s,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.primary + '40', // light primary
+    },
+    guidanceText: {
+        fontSize: 14,
+        color: colors.text,
+        marginBottom: 4,
+        textAlign: 'center',
+    },
+    guidanceSubText: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        fontStyle: 'italic',
     },
     tabScrollConfirm: { borderBottomWidth: 1, borderBottomColor: colors.border },
     tabContainer: { paddingHorizontal: spacing.s },

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { supabase } from '../services/supabase';
 import AppButton from '../components/AppButton';
 import { colors } from '../theme/colors';
@@ -13,21 +13,32 @@ export default function AuthScreen() {
     const [isLogin, setIsLogin] = useState(true);
 
     async function signInWithEmail() {
+        if (!email.includes('@')) {
+            Alert.alert('Validation Error', 'Please sign in with your Email Address.');
+            return;
+        }
         setLoading(true);
         const { error } = await supabase.auth.signInWithPassword({
             email,
             password,
         });
 
-        if (error) Alert.alert('Error', error.message);
+        if (error) {
+            Alert.alert('Sign In Failed', error.message);
+        }
         setLoading(false);
     }
 
     async function signUpWithEmail() {
         if (!username.trim()) {
-            Alert.alert('Error', 'Please enter a username');
+            Alert.alert('Validation Error', 'Please enter a username');
             return;
         }
+        if (password.length < 6) {
+            Alert.alert('Validation Error', 'Password must be at least 6 characters long.');
+            return;
+        }
+
         setLoading(true);
 
         // 1. Sign up auth user
@@ -37,22 +48,22 @@ export default function AuthScreen() {
         });
 
         if (error) {
-            Alert.alert('Error', error.message);
+            Alert.alert('Sign Up Error', error.message);
             setLoading(false);
             return;
         }
 
-        // 2. Check if email verification is enabled (Session will be null)
+        // 2. Check if email verification is enabled
         if (!session && user) {
             Alert.alert(
                 'Check your email',
-                'Registration successful! Please check your email to verify your account, OR go to Supabase > Authentication > Providers > Email and disable "Confirm email" for testing.'
+                'Registration successful! Please check your email to verify your account.'
             );
             setLoading(false);
             return;
         }
 
-        // 3. Create public profile (User is logged in now)
+        // 3. Create public profile
         if (user && session) {
             const { error: profileError } = await supabase
                 .from('profiles')
@@ -62,11 +73,29 @@ export default function AuthScreen() {
 
             if (profileError) {
                 console.error('Profile creation error:', profileError);
-                Alert.alert('Error creating profile', profileError.message);
+                Alert.alert('Profile Error', 'Account created but profile setup failed: ' + profileError.message);
             }
         }
 
         setLoading(false);
+    }
+
+    async function forgotPassword() {
+        if (!email.trim() || !email.includes('@')) {
+            Alert.alert('Input Required', 'Please enter your email address to reset your password.');
+            return;
+        }
+        setLoading(true);
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: 'https://veritas-football.vercel.app/reset-password', // Placeholder URL
+        });
+        setLoading(false);
+
+        if (error) {
+            Alert.alert('Error', error.message);
+        } else {
+            Alert.alert('Check Email', 'If an account exists for this email, you will receive a password reset link.');
+        }
     }
 
     return (
@@ -87,15 +116,16 @@ export default function AuthScreen() {
                 )}
                 <TextInput
                     style={styles.input}
-                    placeholder="Email"
+                    placeholder="Email Address"
                     placeholderTextColor={colors.textSecondary}
                     value={email}
                     onChangeText={setEmail}
                     autoCapitalize="none"
+                    keyboardType="email-address"
                 />
                 <TextInput
                     style={styles.input}
-                    placeholder="Password"
+                    placeholder="Password (min 6 chars)"
                     placeholderTextColor={colors.textSecondary}
                     value={password}
                     onChangeText={setPassword}
@@ -117,6 +147,12 @@ export default function AuthScreen() {
                     outline
                     style={{ marginTop: spacing.m }}
                 />
+
+                {isLogin && (
+                    <TouchableOpacity onPress={forgotPassword} style={styles.forgotButton}>
+                        <Text style={styles.forgotText}>Forgot Password?</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -156,5 +192,14 @@ const styles = StyleSheet.create({
     },
     buttonContainer: {
         marginTop: spacing.s,
+    },
+    forgotButton: {
+        marginTop: spacing.m,
+        alignSelf: 'center',
+        padding: spacing.s,
+    },
+    forgotText: {
+        color: colors.textSecondary,
+        textDecorationLine: 'underline',
     },
 });

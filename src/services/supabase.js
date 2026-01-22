@@ -21,13 +21,20 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
  */
 export async function getUserRecord(userId) {
     try {
-        const { data, error } = await supabase
-            .rpc('get_user_record', { target_user_id: userId });
+        // Fetch record and profile in parallel
+        const [recordRes, profileRes] = await Promise.all([
+            supabase.rpc('get_user_record', { target_user_id: userId }),
+            supabase.from('profiles').select('username').eq('id', userId).single()
+        ]);
 
-        if (error) throw error;
-        return data || { wins: 0, losses: 0, ties: 0 };
+        if (recordRes.error) throw recordRes.error;
+
+        const record = recordRes.data || { wins: 0, losses: 0, ties: 0 };
+        const username = profileRes.data?.username || 'User';
+
+        return { ...record, username };
     } catch (error) {
         console.error('Error fetching user record:', error);
-        return { wins: 0, losses: 0, ties: 0 };
+        return { wins: 0, losses: 0, ties: 0, username: 'User' };
     }
 }
