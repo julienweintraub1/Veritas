@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../services/supabase';
 import AppButton from '../components/AppButton';
 import { colors } from '../theme/colors';
@@ -42,6 +43,70 @@ export default function ProfileScreen() {
             setLoading(false);
         }
     }
+
+    const pickImage = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.5,
+                base64: true,
+            });
+
+            if (!result.canceled) {
+                const asset = result.assets[0];
+                // For web compatibility and simplicity, we can use the base64 data to upload
+                // Or if we are on native, upload via FormData.
+                // However, Supabase Storage upload from React Native often needs ArrayBuffer or Blob.
+                // The most reliable way across platforms for small avatars is base64 decoder or fetch->blob.
+
+                await uploadAvatar(asset);
+            }
+        } catch (error) {
+            Alert.alert('Error picking image', error.message);
+        }
+    };
+
+    const uploadAvatar = async (asset) => {
+        try {
+            setSaving(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('No user logged in!');
+
+            const ext = asset.uri.split('.').pop().toLowerCase();
+            const fileName = `${user.id}-${Date.now()}.${ext}`;
+            const filePath = `${fileName}`;
+
+            // Fetch the file from local URI to get a Blob for upload
+            const response = await fetch(asset.uri);
+            const blob = await response.blob();
+
+            // Setup storage bucket 'avatars' manually in Supabase dashboard if doesn't exist? 
+            // We assume it exists based on our SQL script.
+
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, blob, {
+                    contentType: asset.mimeType || 'image/jpeg',
+                    upsert: true,
+                });
+
+            if (uploadError) {
+                throw uploadError;
+            }
+
+            const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+            setAvatarUrl(data.publicUrl);
+            Alert.alert('Success', 'Image uploaded! Remember to click "Save Profile" to persist changes.');
+
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Upload Failed', error.message);
+        } finally {
+            setSaving(false);
+        }
+    };
 
     async function updateProfile() {
         try {
@@ -96,31 +161,26 @@ export default function ProfileScreen() {
                     placeholderTextColor={colors.textSecondary}
                 />
 
-                <Text style={styles.label}>Avatar URL (Image Link)</Text>
-                <TextInput
-                    style={styles.input}
-                    value={avatarUrl}
-                    onChangeText={setAvatarUrl}
-                    placeholder="https://example.com/image.png"
-                    placeholderTextColor={colors.textSecondary}
-                    autoCapitalize="none"
-                />
-
-                <View style={styles.previewContainer}>
-                    <Text style={styles.label}>Avatar Preview:</Text>
+                <Text style={styles.label}>Profile Picture</Text>
+                <View style={styles.avatarContainer}>
                     {avatarUrl ? (
-                        <View style={styles.avatar}>
-                            {/* In a real app with expo-image, we'd render <Image source={{ uri: avatarUrl }} /> */}
-                            {/* Since we don't know if Image is imported or available easily without hassle, just showing a placeholder block */}
-                            <Text style={{ color: 'white' }}>IMG</Text>
-                        </View>
+                        <Image source={{ uri: avatarUrl }} style={styles.avatar} />
                     ) : (
-                        <View style={[styles.avatar, { backgroundColor: colors.textSecondary }]} />
+                        <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                            <Text style={styles.avatarPlaceholderText}>?</Text>
+                        </View>
                     )}
+                    <AppButton
+                        title="Choose Photo"
+                        onPress={pickImage}
+                        outline
+                        style={styles.pickButton}
+                        textStyle={{ fontSize: 14 }}
+                    />
                 </View>
 
                 <AppButton
-                    title={saving ? "Saving..." : "Update Profile"}
+                    title={saving ? "Saving..." : "Save Profile"}
                     onPress={updateProfile}
                     disabled={saving}
                     style={{ marginTop: spacing.xl }}
@@ -162,18 +222,34 @@ const styles = StyleSheet.create({
         backgroundColor: '#f0f0f0',
         color: '#888',
     },
-    previewContainer: {
+    avatarContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.m,
         marginBottom: spacing.m,
     },
     avatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: colors.primary,
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: colors.card,
+        borderWidth: 2,
+        borderColor: colors.primary,
+    },
+    avatarPlaceholder: {
         justifyContent: 'center',
         alignItems: 'center',
-    }
+        backgroundColor: colors.border,
+        borderColor: colors.textSecondary,
+    },
+    avatarPlaceholderText: {
+        fontSize: 32,
+        color: colors.textSecondary,
+        fontWeight: 'bold',
+    },
+    pickButton: {
+        height: 40,
+        paddingVertical: 0,
+        paddingHorizontal: spacing.m,
+    },
 });

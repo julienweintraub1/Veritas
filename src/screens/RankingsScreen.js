@@ -173,7 +173,7 @@ export default function RankingsScreen({ navigation }) {
                     Rankings save automatically as you move players.
                 </Text>
                 <Text style={styles.guidanceSubText}>
-                    Tip: Use the Wizard for a faster, more accurate starting point!
+                    Tip: Use the Wizard for a faster, more accurate ranking!
                 </Text>
             </View>
 
