@@ -24,15 +24,16 @@ export async function getUserRecord(userId) {
         // Fetch record and profile in parallel
         const [recordRes, profileRes] = await Promise.all([
             supabase.rpc('get_user_record', { target_user_id: userId }),
-            supabase.from('profiles').select('username').eq('id', userId).single()
+            supabase.from('profiles').select('username, avatar_url').eq('id', userId).single()
         ]);
 
         if (recordRes.error) throw recordRes.error;
 
         const record = recordRes.data || { wins: 0, losses: 0, ties: 0 };
         const username = profileRes.data?.username || 'User';
+        const avatarUrl = profileRes.data?.avatar_url || null;
 
-        return { ...record, username };
+        return { ...record, username, avatar_url: avatarUrl };
     } catch (error) {
         console.error('Error fetching user record:', error);
         return { wins: 0, losses: 0, ties: 0, username: 'User' };

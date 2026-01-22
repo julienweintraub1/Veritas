@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase, getUserRecord } from '../services/supabase';
 import { distributeMatchupLineups } from '../services/distribution';
@@ -469,9 +469,13 @@ export default function MatchupScreen({ route, navigation }) {
 
                 <View style={styles.teamHeader}>
                     {/* My Avatar (Placeholder or Real) */}
-                    <View style={styles.avatarSmall}>
-                        <Text style={styles.avatarText}>{recordA.username?.charAt(0) || 'Me'}</Text>
-                    </View>
+                    {recordA.avatar_url ? (
+                        <Image source={{ uri: recordA.avatar_url }} style={styles.avatarSmall} />
+                    ) : (
+                        <View style={styles.avatarSmall}>
+                            <Text style={styles.avatarText}>{recordA.username?.charAt(0) || 'Me'}</Text>
+                        </View>
+                    )}
                     <View style={{ flex: 1 }}>
                         <Text style={styles.teamNameSmall} numberOfLines={1} ellipsizeMode="tail">
                             {recordA.username || 'You'}
@@ -493,9 +497,13 @@ export default function MatchupScreen({ route, navigation }) {
                         </Text>
                         <Text style={styles.recordText}>({recordB.wins}-{recordB.losses}-{recordB.ties})</Text>
                     </View>
-                    <View style={[styles.avatarSmall, { backgroundColor: colors.secondary, marginLeft: 8 }]}>
-                        <Text style={styles.avatarText}>{friend?.username?.charAt(0) || 'Opp'}</Text>
-                    </View>
+                    {recordB.avatar_url ? (
+                        <Image source={{ uri: recordB.avatar_url }} style={[styles.avatarSmall, { marginLeft: 8 }]} />
+                    ) : (
+                        <View style={[styles.avatarSmall, { backgroundColor: colors.secondary, marginLeft: 8 }]}>
+                            <Text style={styles.avatarText}>{friend?.username?.charAt(0) || 'Opp'}</Text>
+                        </View>
+                    )}
                 </View>
             </View>
 
