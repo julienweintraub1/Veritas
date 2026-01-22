@@ -1,0 +1,14 @@
+{
+  "name": "veritas-projections-api",
+  "version": "1.0.0",
+  "description": "Serverless API to fetch NFL projections",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "node-fetch": "^2.6.7"
+  }
+}

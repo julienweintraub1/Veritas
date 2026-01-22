@@ -8,6 +8,7 @@ import HomeScreen from '../screens/HomeScreen';
 import FriendsScreen from '../screens/FriendsScreen';
 import MatchupScreen from '../screens/MatchupScreen';
 import RankingsScreen from '../screens/RankingsScreen';
+import WizardScreen from '../screens/WizardScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -34,6 +35,7 @@ export default function AppNavigator() {
                         <Stack.Screen name="Friends" component={FriendsScreen} options={{ title: 'My Friends' }} />
                         <Stack.Screen name="Matchup" component={MatchupScreen} options={{ title: 'Matchup' }} />
                         <Stack.Screen name="Rankings" component={RankingsScreen} options={{ title: 'My Rankings' }} />
+                        <Stack.Screen name="Wizard" component={WizardScreen} options={{ title: 'Ranking Wizard' }} />
                     </>
                 ) : (
                     // User is not signed in

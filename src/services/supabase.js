@@ -13,3 +13,21 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         detectSessionInUrl: false,
     },
 });
+
+/**
+ * Fetches the Win/Loss/Tie record for a user
+ * @param {string} userId 
+ * @returns {Promise<{wins: number, losses: number, ties: number}>}
+ */
+export async function getUserRecord(userId) {
+    try {
+        const { data, error } = await supabase
+            .rpc('get_user_record', { target_user_id: userId });
+
+        if (error) throw error;
+        return data || { wins: 0, losses: 0, ties: 0 };
+    } catch (error) {
+        console.error('Error fetching user record:', error);
+        return { wins: 0, losses: 0, ties: 0 };
+    }
+}

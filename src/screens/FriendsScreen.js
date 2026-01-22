@@ -84,9 +84,16 @@ export default function FriendsScreen({ navigation }) {
                 .from('profiles')
                 .select('id, username')
                 .eq('username', newFriend.trim())
-                .single();
+                .maybeSingle(); // Use maybeSingle instead of single to avoid error when no user found
 
-            if (searchError || !foundUser) {
+            if (searchError) {
+                console.error('Search error:', searchError);
+                Alert.alert('Error', `Database error: ${searchError.message}`);
+                setLoading(false);
+                return;
+            }
+
+            if (!foundUser) {
                 Alert.alert('Error', 'User not found. Check the username.');
                 setLoading(false);
                 return;
@@ -102,11 +109,10 @@ export default function FriendsScreen({ navigation }) {
             const { data: existing } = await supabase
                 .from('friend_requests')
                 .select('*')
-                .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${foundUser.id}),and(sender_id.eq.${foundUser.id},receiver_id.eq.${currentUser.id})`)
-                .single();
+                .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${foundUser.id}),and(sender_id.eq.${foundUser.id},receiver_id.eq.${currentUser.id})`);
 
-            if (existing) {
-                Alert.alert('Info', `Friendship status is already: ${existing.status}`);
+            if (existing && existing.length > 0) {
+                Alert.alert('Info', `Friendship status is already: ${existing[0].status}`);
                 setLoading(false);
                 return;
             }
