@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase, getUserRecord } from '../services/supabase';
 import { distributeMatchupLineups } from '../services/distribution';
-import { refreshLiveScores, getCurrentWeekGames, shouldPollScores, fetchNFLState, areAllGamesFinal } from '../services/liveScoring';
+import { refreshLiveScores, getCurrentWeekGames, shouldPollScores, fetchNFLState, areAllGamesFinal, getTeamOpponents } from '../services/liveScoring';
 import AppButton from '../components/AppButton';
 import { colors } from '../theme/colors';
 import { spacing, borderRadius } from '../theme/layout';
@@ -304,8 +304,26 @@ export default function MatchupScreen({ route, navigation }) {
             );
 
             if (result.success) {
-                setLineupA(result.lineupA);
-                setLineupB(result.lineupB);
+                // Inject Opponent Data
+                const state = await fetchNFLState();
+                const games = await getCurrentWeekGames(state.week);
+                const opponentMap = getTeamOpponents(games);
+
+                const enrichLineup = (lineup) => {
+                    return lineup.map(slot => {
+                        if (!slot.player) return slot;
+                        return {
+                            ...slot,
+                            player: {
+                                ...slot.player,
+                                opponent: opponentMap[slot.player.team] || null
+                            }
+                        };
+                    });
+                };
+
+                setLineupA(enrichLineup(result.lineupA));
+                setLineupB(enrichLineup(result.lineupB));
                 setTotalA(result.totalA);
                 setTotalB(result.totalB);
             }
@@ -414,6 +432,10 @@ export default function MatchupScreen({ route, navigation }) {
                                             </Text>
                                             {slotA.rank && <Text style={styles.rankText}>#{slotA.rank}</Text>}
                                         </View>
+                                        <View style={styles.matchupInfoRow}>
+                                            <Text style={styles.teamText}>{slotA.player.team}</Text>
+                                            <Text style={styles.oppText}>{slotA.player.opponent ? `@${slotA.player.opponent}` : ''}</Text>
+                                        </View>
                                         <Text style={styles.playerScore}>{slotA.live.toFixed(1)}</Text>
                                     </>
                                 ) : (
@@ -434,6 +456,10 @@ export default function MatchupScreen({ route, navigation }) {
                                                 {slotB.player.first_name.charAt(0)}. {slotB.player.last_name}
                                             </Text>
                                             {slotB.rank && <Text style={styles.rankText}>#{slotB.rank}</Text>}
+                                        </View>
+                                        <View style={[styles.matchupInfoRow, { justifyContent: 'flex-end' }]}>
+                                            <Text style={styles.oppText}>{slotB.player.opponent ? `@${slotB.player.opponent}` : ''}</Text>
+                                            <Text style={[styles.teamText, { marginLeft: 4 }]}>{slotB.player.team}</Text>
                                         </View>
                                         <Text style={styles.playerScore}>{slotB.live.toFixed(1)}</Text>
                                     </>
@@ -575,6 +601,9 @@ const styles = StyleSheet.create({
     playerSlot: { flex: 1, justifyContent: 'center' },
     nameRow: { flexDirection: 'row', alignItems: 'center' },
     playerName: { fontSize: 13, color: colors.text, fontWeight: '600' },
+    matchupInfoRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 1 },
+    teamText: { fontSize: 10, color: colors.textSecondary, fontWeight: 'bold', marginRight: 4 },
+    oppText: { fontSize: 10, color: colors.primary, fontWeight: 'bold' },
     playerScore: { fontSize: 11, color: colors.textSecondary },
     rankText: { fontSize: 10, color: '#6c757d', marginLeft: 4 },
     emptyText: { color: '#ccc', fontSize: 12, fontStyle: 'italic' },

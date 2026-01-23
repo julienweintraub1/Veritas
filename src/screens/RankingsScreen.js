@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
@@ -7,7 +8,7 @@ import { spacing, borderRadius } from '../theme/layout';
 import AppButton from '../components/AppButton';
 import { supabase } from '../services/supabase';
 import { syncPlayersToSupabase } from '../services/sleeper';
-import { fetchNFLState } from '../services/liveScoring';
+import { fetchNFLState, getCurrentWeekGames, getTeamOpponents } from '../services/liveScoring';
 
 const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'SUPERFLEX', 'K', 'DEF'];
 const FORMATS = ['STD', 'PPR', 'HALF'];
@@ -35,10 +36,31 @@ export default function RankingsScreen({ navigation }) {
         }, [selectedPos, selectedFormat])
     );
 
-    // Auto-Sync on Mount
+    // Smart Sync: Run once on mount
     useEffect(() => {
-        handleSync();
+        checkAndSync();
     }, []);
+
+    const checkAndSync = async () => {
+        try {
+            console.log("Checking Smart Sync...");
+            const state = await fetchNFLState();
+            const currentWeek = state.week;
+
+            const lastSyncedWeek = await AsyncStorage.getItem('last_synced_week');
+            console.log(`Smart Sync: Last=${lastSyncedWeek}, Current=${currentWeek}`);
+
+            if (!lastSyncedWeek || parseInt(lastSyncedWeek) < currentWeek) {
+                console.log("Smart Sync: Triggering Sync...");
+                await handleSync();
+                await AsyncStorage.setItem('last_synced_week', currentWeek.toString());
+            } else {
+                console.log("Smart Sync: Up to date. Skipping.");
+            }
+        } catch (error) {
+            console.error("Smart Sync Error:", error);
+        }
+    };
 
     const fetchRankings = async () => {
         setLoading(true);
@@ -106,7 +128,21 @@ export default function RankingsScreen({ navigation }) {
                 });
             }
 
-            setPlayers(finalPlayers);
+            // 4. Inject Opponent Data
+            // Fetch games for "currentWeek" (already fetched state above)
+            const games = await getCurrentWeekGames(state.week);
+
+            const opponentMap = getTeamOpponents(games);
+
+            const playersWithOpponents = finalPlayers.map(p => {
+                const opp = opponentMap[p.team];
+                return {
+                    ...p,
+                    opponent: opp || null
+                };
+            });
+
+            setPlayers(playersWithOpponents);
 
         } catch (error) {
             console.error('Error fetching rankings:', error);
@@ -227,6 +263,11 @@ export default function RankingsScreen({ navigation }) {
                 <View style={styles.playerInfo}>
                     <Text style={styles.playerName}>{item.first_name} {item.last_name}</Text>
                     <Text style={styles.playerDetails}>{item.position} - {item.team || 'FA'}</Text>
+                </View>
+
+                {/* Opponent Column */}
+                <View style={styles.oppColumn}>
+                    <Text style={styles.oppText}>{item.opponent ? `@${item.opponent}` : '-'}</Text>
                 </View>
 
                 <View style={styles.scoreStats}>
@@ -359,6 +400,8 @@ const styles = StyleSheet.create({
     playerInfo: { flex: 1, marginLeft: spacing.s },
     playerName: { fontSize: 16, fontWeight: '500', color: colors.text },
     playerDetails: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    oppColumn: { width: 50, alignItems: 'center', justifyContent: 'center' },
+    oppText: { fontSize: 12, fontWeight: 'bold', color: colors.textSecondary },
     scoreStats: { flexDirection: 'row', gap: 12, marginRight: spacing.m },
     statBox: { alignItems: 'center', minWidth: 40 },
     statLabel: { fontSize: 9, color: colors.textSecondary, fontWeight: 'bold' },

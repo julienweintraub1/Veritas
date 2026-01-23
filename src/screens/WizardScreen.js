@@ -5,6 +5,7 @@ import { supabase } from '../services/supabase';
 import { colors } from '../theme/colors';
 import RankingWizard from '../components/RankingWizard';
 import { loadWizardState } from '../services/wizard';
+import { fetchNFLState, getCurrentWeekGames, getTeamOpponents } from '../services/liveScoring';
 
 /**
  * WizardScreen
@@ -111,6 +112,18 @@ export default function WizardScreen({ route, navigation }) {
 
                 setPlayers(sortedPlayers);
             }
+
+            // Inject Opponent Data
+            // We need to fetch NFL state to get current week
+            const state = await fetchNFLState();
+            const games = await getCurrentWeekGames(state.week);
+            const opponentMap = getTeamOpponents(games);
+
+            // Re-map players effectively to include opponent
+            setPlayers(prevPlayers => prevPlayers.map(p => ({
+                ...p,
+                opponent: opponentMap[p.team] || null
+            })));
 
             setLoading(false);
         } catch (error) {

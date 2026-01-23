@@ -34,7 +34,8 @@ export async function fetchNFLState() {
  */
 export async function fetchNFLSchedule(seasonType, season) {
     try {
-        const type = seasonType === 'post' ? 'postseason' : 'regular';
+        // API seems to accept 'post' for postseason now (at least for 2025)
+        const type = seasonType === 'post' ? 'post' : 'regular';
         const url = `https://api.sleeper.app/schedule/nfl/${type}/${season}`;
 
         const res = await fetch(url);
@@ -66,6 +67,30 @@ export async function getCurrentWeekGames(week) {
         console.error('Error getting current week games:', error);
         return [];
     }
+}
+
+/**
+ * Generates a map of Team -> Opponent for a given set of games
+ * 
+ * @param {Array} games - Array of game objects
+ * @returns {Object} Map of team abbreviation to opponent abbrev (e.g. { "KC": "LV", "LV": "KC" })
+ */
+export function getTeamOpponents(games) {
+    const opponentMap = {};
+    if (!games) return opponentMap;
+
+    games.forEach(game => {
+        // Sleeper API uses 'home' and 'away'
+        const home = game.home || game.home_team;
+        const away = game.away || game.away_team;
+
+        if (home && away) {
+            opponentMap[home] = away; // e.g. KC -> LV
+            opponentMap[away] = home; // e.g. LV -> KC
+        }
+    });
+
+    return opponentMap;
 }
 
 /**
