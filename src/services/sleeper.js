@@ -110,7 +110,9 @@ export const syncPlayersToSupabase = async (onProgress) => {
                     team: p.team || 'FA',
                     active: p.active,
                     projections: proj,
-                    stats: actual // Store actual points
+                    stats: actual, // Keep for legacy if needed
+                    current_week_stats: actual, // CORRECT column for RankingsScreen
+                    stats_week: nflState.week // CORRECT column for validation
                 };
             });
 
